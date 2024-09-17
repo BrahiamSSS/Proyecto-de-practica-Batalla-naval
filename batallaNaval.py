@@ -1,4 +1,4 @@
-# Creación de las clases Ship, Player y BattleshipGame con sus respectivas subclases
+# Creación de las clases Ship, Player y BattleshipGame con sus respectivas subclases y metodos
 class Ship:
     def __init__(self, name:str, size:int):
         self.name = name
@@ -57,17 +57,53 @@ class Battleship(Ship):
 
 class Player:
     def __init__(self, name:str):
+        BOARD_POSITIONS = range(10)
+
         self.name = name
-        self.board = [['' for _ in range(10)] for _ in range(10)]
+        self.board = [['' for _ in BOARD_POSITIONS ] for _ in BOARD_POSITIONS]
+        self.hits = [['' for _ in BOARD_POSITIONS ] for _ in BOARD_POSITIONS]
         self.ships = []
-        self.hits = [['' for _ in range(10)] for _ in range(10)]
+
+    def get_positions(self):
+        start_row = input("Fila inicial: ")
+        start_column = input("Columna inicial: ")
+        direction = input("Dirección (H para horizonatal, V para vertical): ")
+
+        allowed_positions = {str(number) for number in range(1, 11)}
+        allowed_directions ={"H", "V"}
+
+        if start_row not in allowed_positions:
+            return False
+        elif start_column not in allowed_positions:
+            return False
+        elif direction not in allowed_directions:
+            return False
+
+        coordinates = {'start_row': int(start_row), 'start_column':int(start_column), 'direction':direction}
+        return coordinates
 
     def place_ships(self):
-        #TODO: Ubica los barcos en el tablero
-        pass
+        allowed_ships = [Destroyer, Submarine, Battleship]
+        total_ships = range(9)
+        print(f"{self.name} coloca tus barcos")
+
+        for actual_ship in total_ships:
+            ship_selector = actual_ship % 3
+            new_ship = allowed_ships[ship_selector]()
+            print(f"{self.name}, coloca tu {new_ship.name} de tamaño {new_ship.name}")
+
+            self.place_single_ship(new_ship)
+
+    def place_single_ship(self, ship): 
+        coordinates = self.get_positions()
+
+        while coordinates is False:
+            coordinates = self.get_positions()
+
+        ship.place_ship(coordinates['start_row'], coordinates['start_column'], coordinates['direction'], self.board)
 
     def print_board(self):
-        #TODO: 
+        #TODO: Imprime los tableros del jugador
         pass
 
     def attack(self):
