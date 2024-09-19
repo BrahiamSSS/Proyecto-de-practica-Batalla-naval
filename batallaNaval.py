@@ -17,23 +17,28 @@ class Ship:
         elif direction == 'V' and start_row + self.size > vertical_size:
             return False
 
-        self.positions.append([])
-        for piece_position in range(self.size):
-            self.place_ship_piece(start_row, start_column, direction, piece_position, board)
+        for increment in range(self.size):
+            piece_coordinate = self.get_ship_positions(start_row, start_column, direction, increment)
+            self.positions.append(piece_coordinate)
+
+        for piece_postion in self.positions:
+            self.place_piece_in_board(piece_postion, board)
+
+    def place_piece_in_board(self, piece_postion:tuple, board:list):
+        x_position, y_position = piece_postion
+        board[y_position][x_position] = self.name[0]
  
-    def place_ship_piece(self, start_row:int, start_column:int, direction:str, piece_position:int, board:list):
-        ship_coordinates = self.positions[-1]
+    def get_ship_positions(self, start_row:int, start_column:int, direction:str, increment:int):
         x_position = start_column
         y_position = start_row
 
         if direction == 'H':
-            x_position += piece_position
+            x_position += increment
         else:
-            y_position += piece_position
+            y_position += increment
 
-        board[y_position][x_position] = self.name[0]
         piece_coordinate = (x_position, y_position)
-        ship_coordinates.append(piece_coordinate)
+        return piece_coordinate
 
     def hit(self):
         self.hits += 1
@@ -63,7 +68,7 @@ class Player:
         self.hits = [['' for _ in BOARD_POSITIONS ] for _ in BOARD_POSITIONS]
         self.ships = []
 
-    def get_positions(self, messages:dict, has_direction:bool=False):
+    def get_positions(self, messages:dict, has_direction:bool=False, is_attack:bool=False):
         start_row = input(messages['row'])
         start_column = input(messages['column'])
         direction = None
@@ -81,7 +86,20 @@ class Player:
         elif has_direction and direction not in allowed_directions:
             return False
 
-        coordinates = {'start_row': int(start_row), 'start_column':int(start_column), 'direction':direction}
+        start_row = int(start_row)
+        start_column = int(start_column)
+        coordinates = {'start_row': start_row, 'start_column':start_column}
+
+        if is_attack:
+            return coordinates
+
+        ship = self.ships[-1]
+        current_ship_positions = [ship.get_ship_positions(start_row, start_column, increment, direction) for increment in range(ship.size)]
+        all_ships_positions = [position for ship in self.ships for position in ship.position]
+        #TODO: Continuar la logica para evitar la superposición de barcos
+
+
+
         return coordinates
 
     def place_ships(self):
@@ -95,6 +113,7 @@ class Player:
             new_ship = allowed_ships[ship_selector]()
             print(f"{self.name}, coloca tu {new_ship.name} de tamaño {new_ship.name}")
 
+            self.ships.append(new_ship)
             self.place_single_ship(new_ship)
 
     def place_single_ship(self, ship): 
@@ -102,7 +121,7 @@ class Player:
         coordinates = self.get_positions(messages, True)
 
         while coordinates is False:
-            coordinates = self.get_positions(messages, True)
+            coordinates = self.get_positions(messages, ship, True)
 
         ship.place_ship(coordinates['start_row'], coordinates['start_column'], coordinates['direction'], self.board)
 
@@ -125,8 +144,6 @@ class Player:
 
         while coordinates is False:
             coordinates = self.get_positions(messages)
-
-
 
     def all_ships_sunk(self):
         #TODO: Consulta si todos los navios del rival fueron hundidos
