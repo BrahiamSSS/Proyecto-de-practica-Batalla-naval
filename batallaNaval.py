@@ -1,4 +1,5 @@
 # Creación de las clases Ship, Player y BattleshipGame con sus respectivas subclases y metodos
+import os
 class Ship:
     def __init__(self, name:str, size:int):
         self.name = name
@@ -47,6 +48,8 @@ class Ship:
         if is_ship_sunk:
             return True
 
+        return False
+
 class Destroyer(Ship):
     def __init__(self):
         super().__init__('Destructor', 2)
@@ -71,7 +74,7 @@ class Player:
     def get_positions(self, messages:dict, has_direction:bool=False, is_attack:bool=False):
         start_row = input(messages['row'])
         start_column = input(messages['column'])
-        direction = None
+        direction = 'No direction defined'
 
         if has_direction:
             direction = input(messages['direction'])
@@ -86,26 +89,34 @@ class Player:
         elif has_direction and direction not in allowed_directions:
             return False
 
-        start_row = int(start_row)
-        start_column = int(start_column)
-        coordinates = {'start_row': start_row, 'start_column':start_column}
+        coordinates = {'row': int(start_row), 'column':int(start_column), 'direction': direction}
+        current_board_position = self.hits[coordinates['row']][coordinates['column']]
+        is_available_hit_postion = '' == current_board_position
 
-        if is_attack:
+        if not is_available_hit_postion:
+            return False
+        elif is_attack:
             return coordinates
 
         ship = self.ships[-1]
-        current_ship_positions = [ship.get_ship_positions(start_row, start_column, increment, direction) for increment in range(ship.size)]
-        all_ships_positions = [position for ship in self.ships for position in ship.position]
-        #TODO: Continuar la logica para evitar la superposición de barcos
+        current_ship_positions = []
+        for increment in range(ship.size):
+            current_ship_positions.append(
+                ship.get_ship_positions(coordinates['row'], coordinates['column'], coordinates['direction'], increment)
+            )
 
+        all_ships_positions = self.get_all_ship_positions()
+        available_positions = [True for actual_postion in current_ship_positions if actual_postion not in all_ships_positions]
+        all_posions_are_allowed = False not in available_positions
 
+        if not all_posions_are_allowed:
+            return False
 
         return coordinates
 
     def place_ships(self):
-        #TODO: Implementar la verificación para no intentar superponer barcos
         allowed_ships = [Destroyer, Submarine, Battleship]
-        total_ships = range(9)
+        total_ships = range(3)
         print(f"{self.name} coloca tus barcos")
 
         for actual_ship in total_ships:
@@ -123,37 +134,104 @@ class Player:
         while coordinates is False:
             coordinates = self.get_positions(messages, ship, True)
 
-        ship.place_ship(coordinates['start_row'], coordinates['start_column'], coordinates['direction'], self.board)
+        ship.place_ship(coordinates['row'], coordinates['column'], coordinates['direction'], self.board)
 
-    def print_board(self, select_board:str):
-        allowed_boards = {'ships_board':self.ships, 'impacts_board':self.hits}
+    def print_board(self):
+        main_messages = "Elige el tablero a visualizar, para barcos ingresa (ships) y para impactos ingresa (impacts): "
+        select_board = input(main_messages)
+        allowed_boards = {'ships':self.ships, 'impacts':self.hits}
 
-        if select_board not in allowed_boards:
-            return False
+        while select_board not in allowed_boards.keys():
+            select_board = input(main_messages)
 
-        for board_row in allowed_boards["select_board"]:
+        for board_row in allowed_boards[select_board]:
             current_row = ''.join(board_row)
             print(current_row)
 
-    def attack(self, next_player_ships:list):
-        #TODO: Implementar el ataque al barco del enemigo
+    def attack(self, next_player):
         print(f"{self.name}, elige posición para atacar.")
 
         messages = {'row': 'Fila: ', 'column': 'Columna: '}
         coordinates = self.get_positions(messages)
 
         while coordinates is False:
-            coordinates = self.get_positions(messages)
+            coordinates = self.get_positions(messages, is_attack=True)
+
+        x_position, y_position = coordinates['column'], coordinates['row']
+        all_ships_positions = next_player.get_all_ship_positions()
+
+        if (x_position, y_position) not in all_ships_positions:
+            self.hits[y_position][x_position] = 'x'
+            next_player.board[y_position][x_position] = 'x'
+            return None
+
+        ship_selector = all_ships_positions.index((x_position, y_position)) // 3
+        strike_ship = next_player.ships(ship_selector)
+
+        self.hits[y_position][x_position] = 'o'
+        next_player.board[y_position][x_position] = 'x'
+
+        is_ship_sunk = strike_ship.hit()
+        if is_ship_sunk:
+            print(f'El {strike_ship.name} del enemigo ha sido hundido')
+
+        next_player.ship.pop(ship_selector)
+
+    def get_all_ship_positions(self):
+        all_ships_positions = [position for ship in self.ships for position in ship.position]
+        return all_ships_positions
 
     def all_ships_sunk(self):
-        #TODO: Consulta si todos los navios del rival fueron hundidos
-        pass
+        current_shps_total = len(self.ships)
+        if current_shps_total != 0:
+            return False
+
+        return True
 
 class BattleshipGame:
     def __init__(self, player1:str, player2:str):
         self.player1 = Player(player1)
         self.player2 = Player(player2)
 
+        self.play()
+
     def play(self):
-        #TODO: Empieza el juego
-        pass
+        player1 = self.player1
+        player2 = self.player2
+
+        player1.place_ships()
+        player2.place_ships()
+
+        is_finish_game = self.turn(player1, player2)
+        while is_finish_game != True:
+            player1 = player2
+            player2 = player1
+            is_finish_game = self.turn(player1, player2)
+
+        print(f"¡¡¡Felicidades jugador {player1.name} has eliminado la flota del rival!!!")
+
+    def turn(self, current_player, next_player):
+        main_messages = f"""Es el turno del jugador {current_player.name} tus acciones disponibles en el turno son:
+                            1. Atacar al enemigo
+                            2. Visualizar tus tableros
+                            3. Finalizar tu turno
+                        """
+        play = input(main_messages)
+        allowed_actions = ["1", "2", "3"]
+
+        while play not in allowed_actions:
+            play = input(main_messages)
+
+        if play == "1":
+            current_player.attack(next_player)
+        elif play == "2":
+            current_player.print_board()
+
+        os.system('clear')
+        if next_player.all_ships_sunk():
+            return True
+        else:
+            return False
+
+# Iniciamos el juego
+BattleshipGame('Brahiam', 'Nicolas')
