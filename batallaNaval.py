@@ -73,8 +73,8 @@ class Player:
         BOARD_POSITIONS = range(10)
 
         self.name = name
-        self.board = [['' for _ in BOARD_POSITIONS ] for _ in BOARD_POSITIONS]
-        self.hits = [['' for _ in BOARD_POSITIONS ] for _ in BOARD_POSITIONS]
+        self.board = [[' ' for _ in BOARD_POSITIONS ] for _ in BOARD_POSITIONS]
+        self.hits = [[' ' for _ in BOARD_POSITIONS ] for _ in BOARD_POSITIONS]
         self.ships = []
 
     def get_positions(self, messages:dict, has_direction:bool=False, is_attack:bool=False):
@@ -97,7 +97,7 @@ class Player:
 
         coordinates = {'row': int(start_row) - 1, 'column':int(start_column) - 1, 'direction': direction}
         current_board_position = self.hits[coordinates['row']][coordinates['column']]
-        is_available_hit_postion = '' == current_board_position
+        is_available_hit_postion = ' ' == current_board_position
 
         if not is_available_hit_postion:
             return False
@@ -124,7 +124,7 @@ class Player:
 
     def place_ships(self, clean_screen):
         allowed_ships = [Destroyer, Submarine, Battleship]
-        total_ships = range(1) # Only for test
+        total_ships = range(9)
         print(f'{self.name} coloca tus barcos')
 
         for actual_ship in total_ships:
@@ -141,11 +141,12 @@ class Player:
 
         while coordinates is False:
             clean_screen()
-            print(f'{self.name}, coloca tu {ship.name} de tamaño {ship.size}')
             print('Las posiciones ingresadas no son validas')
+            print(f'{self.name}, coloca tu {ship.name} de tamaño {ship.size}')
             coordinates = self.get_positions(messages, ship, True)
 
         ship.place_ship(coordinates['row'], coordinates['column'], coordinates['direction'], self.board)
+        clean_screen()
 
     def print_board(self):
         main_messages = 'Elige el tablero a visualizar, para barcos ingresa (ships) y para impactos ingresa (impacts): '
@@ -155,11 +156,17 @@ class Player:
         while select_board not in allowed_boards.keys():
             select_board = input(main_messages)
 
-        for board_row in allowed_boards[select_board]:
-            current_row = ''.join(board_row)
-            print(current_row)
+        header_row = [str(column + 1) for column in range(10)]
+        header_row = ' ' +  '|'.join(header_row) + '|'
+        rows_letters = [letter.upper() for letter in 'abcedfjhij']
+        barrier = '-' * len(header_row)
+        print(header_row, barrier, sep='\n')
 
-    def attack(self, next_player):
+        for row_number, board_row in enumerate(allowed_boards[select_board]):
+            current_row = rows_letters[row_number] +'|' + '|'.join(board_row) + '|'
+            print(current_row, barrier, sep='\n')
+
+    def attack(self, next_player, clean_screen):
         print(f'{self.name}, elige posición para atacar.')
 
         messages = {'row': 'Fila: ', 'column': 'Columna: '}
@@ -170,8 +177,10 @@ class Player:
 
         x_position, y_position = coordinates['column'], coordinates['row']
         all_ships_positions = next_player.get_all_ship_positions()
+        attack_position = (x_position, y_position)
 
-        if (x_position, y_position) not in all_ships_positions:
+        if attack_position not in all_ships_positions:
+            clean_screen()
             print('Haz impactado en el agua')
             self.hits[y_position][x_position] = 'x'
             next_player.board[y_position][x_position] = 'x'
@@ -179,12 +188,13 @@ class Player:
 
         ship_selector = all_ships_positions.index((x_position, y_position)) // 3
         strike_ship = next_player.ships[ship_selector]
+        clean_screen()
         print('Haz impactado uno de los navios del rival')
 
         self.hits[y_position][x_position] = 'o'
         next_player.board[y_position][x_position] = 'x'
-
         is_ship_sunk = strike_ship.hit()
+
         if is_ship_sunk:
             print(f'El {strike_ship.name} del enemigo ha sido hundido')
             next_player.ships.pop(ship_selector)
@@ -195,6 +205,7 @@ class Player:
 
     def all_ships_sunk(self):
         current_shps_total = len(self.ships)
+
         if current_shps_total != 0:
             return False
 
@@ -218,6 +229,7 @@ class BattleshipGame:
         self.clean_screen()
 
         is_finish_game = self.turn_controler(player1, player2)
+
         while is_finish_game != True:
             player1, player2 = player2, player1
             self.clean_screen()
@@ -225,6 +237,7 @@ class BattleshipGame:
             self.clean_screen()
 
         total_ships_player_1 = len(player1.ships)
+
         if total_ships_player_1 == 0:
             player1, player2 = player2, player1
 
@@ -235,7 +248,22 @@ class BattleshipGame:
         if next_player.all_ships_sunk():
             return True
 
-        main_messages = f'''Es el turno del jugador {current_player.name} tus acciones disponibles en el turno son:\n---------------------------------------------------------------------------------------\n1. Atacar al enemigo (Tus ataques restantes son: {strikes_per_turn})\n2. Visualizar tus tableros\n3. Finalizar tu turno\n4. Limpia la pantalla\n5. Rendirse\n---------------------------------------------------------------------------------------\ninserta tu accion: '''
+        main_messages = [
+            f'Es el turno del jugador {current_player.name} tus acciones disponibles en el turno son:',
+            '=',
+            f'1. Atacar al enemigo (Tus ataques restantes son: {strikes_per_turn})',
+            '2. Visualizar tus tableros',
+            '3. Finalizar tu turno',
+            '4. Limpia la pantalla',
+            '5. Rendirse',
+            '=',
+            'Inserta tu accion: '
+        ]
+        main_messages[1] = main_messages[1] * len(main_messages[0])
+        main_messages[-2] = main_messages[-2] * len(main_messages[0])
+        main_messages = '\n'.join(main_messages)
+
+
         action = input(main_messages).strip()
         allowed_actions = {'1':'attack', '2':'screen', '3':'next turn', '4':'clear', '5':'surrender'}
 
@@ -243,25 +271,25 @@ class BattleshipGame:
             action = input(main_messages)
 
         action = allowed_actions[action]
-        if action == 'next turn':
-            return action
-        elif action == 'attack' and strikes_per_turn > 0:
+
+        if action == allowed_actions['1'] and strikes_per_turn > 0:
             self.clean_screen()
-            current_player.attack(next_player)
+            current_player.attack(next_player, self.clean_screen)
             strikes_per_turn -= 1
-        elif action == 'screen':
+        elif action == allowed_actions['2']:
             self.clean_screen()
             current_player.print_board()
-        elif action == 'next turn ':
+        elif action == allowed_actions['3']:
             return False
-        elif action == 'clear':
+        elif action == allowed_actions['4']:
             self.clean_screen()
-        elif action == 'surrender':
+        elif action == allowed_actions['5']:
             current_player.ships.clear()
             return True
 
         screen_change = None
-        while action == 'screen' and screen_change != '':
+
+        while action == allowed_actions['2'] and screen_change != '':
             screen_change = input('Para volver al menu presiona enter: ')
             self.clean_screen()
 
@@ -269,10 +297,12 @@ class BattleshipGame:
 
     def turn_controler(self, current_player, next_player):
         turn_result = self.turn(current_player,next_player)
+
         while type(turn_result) is tuple:
             current_player = turn_result[0]
             next_player =  turn_result[1]
             strikes_per_turn = turn_result[2]
+
             turn_result = self.turn(current_player, next_player, strikes_per_turn)
 
         return turn_result
@@ -282,5 +312,16 @@ class BattleshipGame:
         os.system('clear')
 
 # Iniciamos el juego
-<F3>
-BattleshipGame('Brahiam', 'Nicolas')
+def solicitud_nombre_jugador(order_jugador:int):
+    jugador = ''
+    confirmar_jugador = False
+
+    while confirmar_jugador != '':
+        jugador = input(f'Insertar el nombre del jugador {order_jugador}: ')
+        confirmar_jugador = input(f'El nombre escogido para el jugador {order_jugador} es {jugador} para confirmar dar enter, para cambiar insertar cualquier caracter: ').upper()
+
+    return jugador
+
+primer_jugador = solicitud_nombre_jugador(1)
+segundo_jugador = solicitud_nombre_jugador(2)
+BattleshipGame(primer_jugador, segundo_jugador)
